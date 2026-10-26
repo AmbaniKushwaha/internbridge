@@ -1,0 +1,6 @@
+{
+  "name": "InternBridge - Student & Business Project Matching",
+  "description": "Student-Business Project Discovery and Team Matching Platform connecting college students with real-world business opportunities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
