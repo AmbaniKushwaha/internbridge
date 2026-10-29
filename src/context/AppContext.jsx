@@ -329,7 +329,7 @@ export const AppProvider = ({ children }) => {
   const syncWithBackend = useCallback(async () => {
     try {
       // 1. Check live backend health
-      const healthRes = await fetch('/api/health').catch(() => null);
+     const healthRes = await fetch(`${import.meta.env.VITE_API_URL}/api/health`).catch(() => null);
       if (healthRes && healthRes.ok) {
         setIsBackendConnected(true);
       } else {
