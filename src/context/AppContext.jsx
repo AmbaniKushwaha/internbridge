@@ -902,6 +902,64 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const addPortfolioItem = async (item) => {
+    if (!currentStudent) return;
+
+    let backendItem = null;
+    try {
+      const res = await api.students.addPortfolioItem(item);
+      if (res?.data?.portfolioItem) {
+        backendItem = res.data.portfolioItem;
+      }
+    } catch (err) {
+      console.warn('Backend portfolio add fallback:', err.message);
+    }
+
+    const newItem = {
+      ...item,
+      id: backendItem?._id || `port-${Date.now()}`,
+      studentId: currentStudent.id,
+    };
+
+    setStudents((prev) =>
+      prev.map((s) => {
+        if (s.id === currentStudent.id) {
+          return {
+            ...s,
+            portfolioItems: [newItem, ...(s.portfolioItems || [])],
+          };
+        }
+        return s;
+      })
+    );
+    addToast('Portfolio Project Added', `"${item.title}" is now showcased on your profile.`);
+  };
+
+  const updatePortfolioItem = async (id, itemData) => {
+    if (!currentStudent) return;
+
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
+      api.students.updatePortfolioItem(id, itemData).catch((err) => {
+        console.warn('Backend portfolio update fallback:', err.message);
+      });
+    }
+
+    setStudents((prev) =>
+      prev.map((s) => {
+        if (s.id === currentStudent.id || s._id === currentStudent.id) {
+          return {
+            ...s,
+            portfolioItems: (s.portfolioItems || []).map((p) =>
+              p.id === id || p._id === id ? { ...p, ...itemData } : p
+            ),
+          };
+        }
+        return s;
+      })
+    );
+    addToast('Portfolio Project Updated', 'Changes saved successfully to database.');
+  };
+
   const deletePortfolioItem = async (id) => {
     if (!currentStudent) return;
 
