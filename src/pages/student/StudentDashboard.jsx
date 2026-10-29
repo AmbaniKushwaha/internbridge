@@ -134,7 +134,11 @@ export const StudentDashboard = () => {
       <Card hover={false} className="p-6 sm:p-8 bg-white border border-slate-200/90 shadow-sm relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div className="flex items-center gap-4">
-            <div className="relative">
+            <Link
+              to="/student/profile"
+              className="relative group block shrink-0 cursor-pointer"
+              title="Click to update profile & avatar"
+            >
               <Avatar
                 src={student.avatar}
                 name={student.name}
@@ -142,7 +146,10 @@ export const StudentDashboard = () => {
                 rounded="rounded-2xl"
               />
               <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white" />
-            </div>
+              <span className="absolute inset-0 rounded-2xl bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold">
+                Edit
+              </span>
+            </Link>
 
             <div>
               <div className="flex items-center gap-2.5">

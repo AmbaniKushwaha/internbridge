@@ -329,7 +329,7 @@ export const AppProvider = ({ children }) => {
   const syncWithBackend = useCallback(async () => {
     try {
       // 1. Check live backend health
-     const healthRes = await fetch(`${import.meta.env.VITE_API_URL}/api/health`).catch(() => null);
+      const healthRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/health`).catch(() => null);
       if (healthRes && healthRes.ok) {
         setIsBackendConnected(true);
       } else {
@@ -712,8 +712,68 @@ export const AppProvider = ({ children }) => {
   };
 
   // ============================================================================
-  // Student Profile & Portfolio
+  // Student & User Profile & Portfolio
   // ============================================================================
+
+  const uploadAvatar = async (file) => {
+    if (!file) return null;
+
+    if (file.size > 5 * 1024 * 1024) {
+      addToast('File too large', 'Profile picture must be under 5MB.', 'error');
+      throw new Error('File size exceeds 5MB limit.');
+    }
+
+    // 1. Read locally as Base64 for instantaneous UI update / fallback
+    const localDataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    let uploadedUrl = localDataUrl;
+
+    // 2. Upload to backend if token exists
+    try {
+      const token = localStorage.getItem('internbridge_auth_token');
+      if (token) {
+        const res = await api.upload.avatar(file);
+        if (res?.data?.avatar) {
+          uploadedUrl = res.data.avatar;
+        }
+      }
+    } catch (err) {
+      console.warn('Backend avatar upload fallback to local image:', err.message);
+    }
+
+    // 3. Update current user state
+    setCurrentUser((prev) => (prev ? { ...prev, avatar: uploadedUrl } : null));
+
+    // 4. Update student or business state
+    if (currentUser?.role === 'student' && currentStudent) {
+      setStudents((prev) =>
+        prev.map((s) => (s.id === currentStudent.id ? { ...s, avatar: uploadedUrl } : s))
+      );
+      setTeams((prev) =>
+        prev.map((t) => ({
+          ...t,
+          members: (t.members || []).map((m) =>
+            m.studentId === currentStudent.id ? { ...m, avatar: uploadedUrl } : m
+          ),
+        }))
+      );
+    } else if (currentUser?.role === 'business' && currentBusiness) {
+      setBusinesses((prev) =>
+        prev.map((b) => (b.id === currentBusiness.id ? { ...b, logo: uploadedUrl } : b))
+      );
+      setProjects((prev) =>
+        prev.map((p) => (p.businessId === currentBusiness.id ? { ...p, businessLogo: uploadedUrl } : p))
+      );
+    }
+
+    addToast('Picture Uploaded', 'Your profile picture has been updated.');
+    return uploadedUrl;
+  };
 
   const updateStudentProfile = async (data) => {
     if (!currentStudent) return;
@@ -723,71 +783,54 @@ export const AppProvider = ({ children }) => {
       console.warn('Backend profile update fallback:', err.message);
     });
 
-    setStudents((prev) =>
-      prev.map((s) => (s.id === currentStudent.id ? { ...s, ...data } : s))
-    );
-    if (data.name && currentUser) {
-      setCurrentUser((prev) => (prev ? { ...prev, name: data.name } : null));
-    }
-    addToast('Profile Updated', 'Your student profile details have been saved.');
-  };
-
-  const addPortfolioItem = async (item) => {
-    if (!currentStudent) return;
-
-    let backendItem = null;
-    try {
-      const res = await api.students.addPortfolioItem(item);
-      if (res?.data?.portfolioItem) {
-        backendItem = res.data.portfolioItem;
-      }
-    } catch (err) {
-      console.warn('Backend portfolio add fallback:', err.message);
-    }
-
-    const newItem = {
-      ...item,
-      id: backendItem?._id || `port-${Date.now()}`,
-      studentId: currentStudent.id,
-    };
+    const newAvatar = data.avatar;
+    const newName = data.name;
 
     setStudents((prev) =>
       prev.map((s) => {
         if (s.id === currentStudent.id) {
           return {
             ...s,
-            portfolioItems: [newItem, ...(s.portfolioItems || [])],
+            ...data,
+            avatar: newAvatar !== undefined ? newAvatar : s.avatar,
+            name: newName || s.name,
           };
         }
         return s;
       })
     );
-    addToast('Portfolio Project Added', `"${item.title}" is now showcased on your profile.`);
-  };
 
-  const updatePortfolioItem = async (id, itemData) => {
-    if (!currentStudent) return;
-
-    if (/^[0-9a-fA-F]{24}$/.test(id)) {
-      api.students.updatePortfolioItem(id, itemData).catch((err) => {
-        console.warn('Backend portfolio update fallback:', err.message);
-      });
+    if (currentUser) {
+      setCurrentUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...(newName ? { name: newName } : {}),
+              ...(newAvatar !== undefined ? { avatar: newAvatar } : {}),
+            }
+          : null
+      );
     }
 
-    setStudents((prev) =>
-      prev.map((s) => {
-        if (s.id === currentStudent.id || s._id === currentStudent.id) {
-          return {
-            ...s,
-            portfolioItems: (s.portfolioItems || []).map((p) =>
-              p.id === id || p._id === id ? { ...p, ...itemData } : p
-            ),
-          };
-        }
-        return s;
-      })
-    );
-    addToast('Portfolio Project Updated', 'Changes saved successfully to database.');
+    if (newAvatar !== undefined || newName) {
+      setTeams((prev) =>
+        prev.map((t) => ({
+          ...t,
+          leaderName: t.leaderId === currentStudent.id && newName ? newName : t.leaderName,
+          members: (t.members || []).map((m) =>
+            m.studentId === currentStudent.id
+              ? {
+                  ...m,
+                  name: newName || m.name,
+                  avatar: newAvatar !== undefined ? newAvatar : m.avatar,
+                }
+              : m
+          ),
+        }))
+      );
+    }
+
+    addToast('Profile Updated', 'Your student profile details have been saved.');
   };
 
   const updateBusinessProfile = async (data) => {
@@ -799,13 +842,64 @@ export const AppProvider = ({ children }) => {
       console.warn('Backend business profile update fallback:', err.message);
     }
 
+    const newLogo = data.logo !== undefined ? data.logo : data.avatar;
+    const newName = data.companyName || data.name;
+
     setBusinesses((prev) =>
-      prev.map((b) => (b.id === currentBusiness.id || b.userId === currentUser?.id ? { ...b, ...data } : b))
+      prev.map((b) =>
+        b.id === currentBusiness.id || b.userId === currentUser?.id
+          ? {
+              ...b,
+              ...data,
+              name: newName || b.name,
+              companyName: newName || b.companyName,
+              logo: newLogo !== undefined ? newLogo : b.logo,
+            }
+          : b
+      )
     );
-    if ((data.name || data.companyName) && currentUser) {
-      setCurrentUser((prev) => (prev ? { ...prev, name: data.companyName || data.name } : null));
+
+    if (currentUser) {
+      setCurrentUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...(newName ? { name: newName } : {}),
+              ...(newLogo !== undefined ? { avatar: newLogo } : {}),
+            }
+          : null
+      );
     }
-    addToast('Business Profile Updated', 'Your business profile details have been saved to the database.');
+
+    if (newLogo !== undefined) {
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.businessId === currentBusiness.id ? { ...p, businessLogo: newLogo } : p
+        )
+      );
+    }
+
+    addToast('Business Profile Updated', 'Your business profile details have been saved.');
+  };
+
+  const updateUserProfile = async (data) => {
+    if (!currentUser) return;
+
+    try {
+      await api.auth.updateProfile(data);
+    } catch (err) {
+      console.warn('Backend auth profile update fallback:', err.message);
+    }
+
+    setCurrentUser((prev) => (prev ? { ...prev, ...data } : null));
+
+    if (currentUser.role === 'student' && currentStudent) {
+      updateStudentProfile(data);
+    } else if (currentUser.role === 'business' && currentBusiness) {
+      updateBusinessProfile(data);
+    } else {
+      addToast('Profile Saved', 'Your user account details have been updated.');
+    }
   };
 
   const deletePortfolioItem = async (id) => {
@@ -1419,6 +1513,8 @@ export const AppProvider = ({ children }) => {
         registerBusiness,
         updateStudentProfile,
         updateBusinessProfile,
+        updateUserProfile,
+        uploadAvatar,
         addPortfolioItem,
         updatePortfolioItem,
         deletePortfolioItem,

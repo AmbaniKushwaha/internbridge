@@ -43,12 +43,21 @@ export const BusinessDashboard = () => {
       {/* Header Banner */}
       <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <Avatar
-            src={business.logo}
-            name={business.name}
-            size="2xl"
-            rounded="rounded-2xl"
-          />
+          <Link
+            to="/business/profile"
+            className="relative group block shrink-0 cursor-pointer"
+            title="Click to update company logo & profile"
+          >
+            <Avatar
+              src={business.logo}
+              name={business.name}
+              size="2xl"
+              rounded="rounded-2xl"
+            />
+            <span className="absolute inset-0 rounded-2xl bg-black/40 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold">
+              Edit
+            </span>
+          </Link>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">

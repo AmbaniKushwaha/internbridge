@@ -3,7 +3,8 @@
  * Centralized fetch wrapper communicating with Express backend via /api
  */
 
-const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
+const BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_BASE = `${BASE_URL}/api`;
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('internbridge_auth_token');
@@ -23,7 +24,7 @@ const handleResponse = async (res) => {
 };
 
 export const api = {
-  // Authentication
+  // Authentication & User Profile
   auth: {
     login: async (email, password) => {
       const res = await fetch(`${API_BASE}/auth/login`, {
@@ -55,8 +56,42 @@ export const api = {
       });
       return handleResponse(res);
     },
+    updateProfile: async (userData) => {
+      const res = await fetch(`${API_BASE}/auth/profile`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(userData),
+      });
+      return handleResponse(res);
+    },
     logout: () => {
       localStorage.removeItem('internbridge_auth_token');
+    },
+  },
+
+  // Media & Avatar Uploads
+  upload: {
+    image: async (file) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      const token = localStorage.getItem('internbridge_auth_token');
+      const res = await fetch(`${API_BASE}/upload`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      return handleResponse(res);
+    },
+    avatar: async (file) => {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      const token = localStorage.getItem('internbridge_auth_token');
+      const res = await fetch(`${API_BASE}/upload/avatar`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      return handleResponse(res);
     },
   },
 
